@@ -1,19 +1,6 @@
 let animationStarted = false;
 let userNickname = "";
-
-// ============================
-// CALIBRATED MAP CONFIGURATION (ANKARA)
-// ============================
-const map = new maplibregl.Map({
-    container: 'map',
-    style: 'https://tiles.openfreemap.org/styles/liberty',
-    center: [32.8540, 39.9195], 
-    zoom: 13.6,                
-    minZoom: 13.6,             
-    maxZoom: 13.6,             
-    dragPan: false, doubleClickZoom: false, boxZoom: false, keyboard: false, touchZoomRotate: false,    
-    pixelRatio: window.devicePixelRatio || 2 
-});
+let map = null;
 
 // ============================
 // ANKARA KML GEOMETRY VERTICES
@@ -64,6 +51,7 @@ function createMarkerElement(person) {
 const markerInstances = {};
 
 function initMarkers() {
+    if (!map) return;
     people.forEach(person => {
         const marker = new maplibregl.Marker({ element: createMarkerElement(person), anchor: "center" })
         .setLngLat(positions[person.id])
@@ -77,17 +65,21 @@ function initMarkers() {
 // ============================
 const PRE_SEQUENCE_DURATION = 30 * 1000; 
 const DELAY_DURATION = 5 * 1000;         
-const MOVE_DURATION = 15 * 1000;       
+const MOVE_DURATION = 15 * 1000; // 15 saniyeye düşürüldü       
 let startTime = null;
 
 const startG = positions.leftNode;
 const startM = positions.rightNode;
 const startMain = positions.mainNode;
 
-// DÜZELTİLMİŞ ORBITING AYARLARI (Daha az mesafe ve çok daha yavaş)
-const ORBIT_RADIUS = 0.0003;        // Yarıçap belirgin şekilde daraltıldı (Az mesafe)
-const ORBIT_SPEED_MULTIPLIER = 0.6; // Dönüş hızı düşürüldü (Çok daha yavaş)
+const midLng = (startG[0] + startM[0]) / 2;
+const midLat = (startG[1] + startM[1]) / 2; 
+const offsetPercent = 0.04; 
+const deltaLng = startM[0] - startG[0];
+const deltaLat = startM[1] - startG[1];
 
+const targetG = [midLng - (deltaLng * offsetPercent), midLat - (deltaLat * offsetPercent)];
+const targetM = [midLng + (deltaLng * offsetPercent), midLat + (deltaLat * offsetPercent)];
 const stepLng = 0.0025; const stepLat = 0.0018;
 
 // Vectors
@@ -115,7 +107,7 @@ function animateNodes(timestamp) {
     let currentM_Lng = startM[0]; let currentM_Lat = startM[1];
 
     if (elapsed < PRE_SEQUENCE_DURATION) {
-        // Koreografi Aşamaları
+        // Choreography Logic (maintained)
         if (elapsed < 3000) { currentG_Lng = startG[0]; currentG_Lat = startG[1]; } 
         else if (elapsed < 7000) { const p = (elapsed - 3000) / 4000; currentG_Lng = startG[0] + (gStepToMainLng * p); currentG_Lat = startG[1] + (gStepToMainLat * p); } 
         else if (elapsed < 8000) { currentG_Lng = startG[0] + gStepToMainLng; currentG_Lat = startG[1] + gStepToMainLat; }
@@ -139,43 +131,30 @@ function animateNodes(timestamp) {
 
     } else {
         const mainElapsed = elapsed - PRE_SEQUENCE_DURATION;
-
-        if (mainElapsed < DELAY_DURATION) {
-            currentG_Lng = startG[0]; currentG_Lat = startG[1];
-            currentM_Lng = startM[0]; currentM_Lat = startM[1];
-        } else {
-            const moveElapsed = mainElapsed - DELAY_DURATION; 
-            const totalSeconds = moveElapsed / 1000;
-            const angle = totalSeconds * ORBIT_SPEED_MULTIPLIER;
-
-            currentG_Lng = startG[0] + Math.cos(angle) * ORBIT_RADIUS;
-            currentG_Lat = startG[1] + Math.sin(angle) * ORBIT_RADIUS;
-
-            currentM_Lng = startM[0] + Math.cos(angle + Math.PI) * ORBIT_RADIUS; 
-            currentM_Lat = startM[1] + Math.sin(angle + Math.PI) * ORBIT_RADIUS;
-        }
+        let progress = 0;
+        if (mainElapsed < DELAY_DURATION) progress = 0;
+        else { const moveElapsed = mainElapsed - DELAY_DURATION; progress = Math.min(moveElapsed / MOVE_DURATION, 1); }
+        currentG_Lng = startG[0] + (targetG[0] - startG[0]) * progress;
+        currentG_Lat = startG[1] + (targetG[1] - startG[1]) * progress;
+        currentM_Lng = startM[0] + (targetM[0] - startM[0]) * progress;
+        currentM_Lat = startM[1] + (targetM[1] - startM[1]) * progress;
     }
 
     if (markerInstances["leftNode"]) markerInstances["leftNode"].setLngLat([currentG_Lng, currentG_Lat]);
     if (markerInstances["rightNode"]) markerInstances["rightNode"].setLngLat([currentM_Lng, currentM_Lat]);
-
-    // Toplam süre dolana kadar animasyonu sürdür
+    
+    // GÜNCELLEME: Tüm animasyon süresi tamamlandığında Qualtrics'i ilerlet
     if (elapsed < (PRE_SEQUENCE_DURATION + DELAY_DURATION + MOVE_DURATION)) {
         requestAnimationFrame(animateNodes);
     } else {
-        // GÜNCELLEME: Tüm süre bittiğinde Qualtrics anketini ilerletmesi için üst pencereye sinyal gönderir
+        // Manipülasyon (Buluşma hareketleri) bittiği an çalışan güvenli yönlendirme bloğu
         setTimeout(() => {
             if (window.parent) {
                 window.parent.postMessage("mapAnimationFinished", "*");
             }
-        }, 1000); 
+        }, 1000); // Son kareyi 1 saniye ekranda tutup ardından Qualtrics'i tetikler
     }
 }
-
-map.on('load', () => {
-    map.getCanvas().style.filter = 'grayscale(0.6) contrast(1.1) brightness(0.95) hue-rotate(25deg)';
-    startExperimentFlow();
-});
 
 const flowScreen = document.getElementById("experiment-flow-screen");
 const stepConnecting = document.getElementById("step-connecting");
@@ -187,32 +166,61 @@ const submitBtn = document.getElementById("submit-btn");
 
 function startExperimentFlow() {
     setTimeout(() => {
-        stepConnecting.classList.add("hidden");
-        stepWaiting.classList.remove("hidden");
+        if (stepConnecting) stepConnecting.classList.add("hidden");
+        if (stepWaiting) stepWaiting.classList.remove("hidden");
         setTimeout(() => {
-            stepWaiting.classList.add("hidden");
-            stepJoined.classList.remove("hidden");
+            if (stepWaiting) stepWaiting.classList.add("hidden");
+            if (stepJoined) stepJoined.classList.remove("hidden");
             setTimeout(() => {
-                stepJoined.classList.add("hidden");
-                stepNickname.classList.remove("hidden");
-                nicknameInput.focus();
+                if (stepJoined) stepJoined.classList.add("hidden");
+                if (stepNickname) stepNickname.classList.remove("hidden");
+                if (nicknameInput) nicknameInput.focus();
             }, 3000);
         }, 5000);
     }, 3000);
 }
 
 function handleLoginSubmit() {
-    const val = nicknameInput.value.trim();
+    const val = nicknameInput ? nicknameInput.value.trim() : "User";
     if (val === "") { alert("Please enter a valid nickname."); return; }
     userNickname = val;
-    flowScreen.style.opacity = "0";
-    flowScreen.style.transform = "scale(0.95)";
+    if (flowScreen) {
+        flowScreen.style.opacity = "0";
+        flowScreen.style.transform = "scale(0.95)";
+    }
     setTimeout(() => {
-        flowScreen.style.display = "none";
+        if (flowScreen) flowScreen.style.display = "none";
         initMarkers();
         animationStarted = true;
         requestAnimationFrame(animateNodes);
     }, 500);
 }
-submitBtn.addEventListener("click", handleLoginSubmit);
-nicknameInput.addEventListener("keypress", (e) => { if (e.key === "Enter") handleLoginSubmit(); });
+if (submitBtn) submitBtn.addEventListener("click", handleLoginSubmit);
+if (nicknameInput) {
+    nicknameInput.addEventListener("keypress", (e) => { if (e.key === "Enter") handleLoginSubmit(); });
+}
+
+// 1. KİLİTLENMEYİ ENGELLEYEN ADIM: Deney akışı haritayı beklemeden anında başlar
+startExperimentFlow();
+
+// 2. KİLİTLENMEYİ ENGELLEYEN ADIM: Harita güvenli alanda yüklenir (Hata verse bile sayfa çökmez)
+try {
+    if (typeof maplibregl !== 'undefined') {
+        map = new maplibregl.Map({
+            container: 'map',
+            style: 'https://tiles.openfreemap.org/styles/liberty',
+            center: [32.8540, 39.9195], 
+            zoom: 13.6,                
+            minZoom: 13.6,             
+            maxZoom: 13.6,             
+            dragPan: false, doubleClickZoom: false, boxZoom: false, keyboard: false, touchZoomRotate: false,    
+            pixelRatio: window.devicePixelRatio || 2 
+        });
+
+        map.on('load', () => {
+            map.getCanvas().style.filter = 'grayscale(0.6) contrast(1.1) brightness(0.95) hue-rotate(25deg)';
+        });
+    }
+} catch (e) {
+    console.error("Harita kütüphanesi yükleme engeli:", e);
+}
