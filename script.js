@@ -1,6 +1,7 @@
 let animationStarted = false;
 let userNickname = "";
 let map = null;
+const markerInstances = {};
 
 // ============================
 // ANKARA KML GEOMETRY VERTICES
@@ -48,8 +49,6 @@ function createMarkerElement(person) {
     return clusterEl;
 }
 
-const markerInstances = {};
-
 function initMarkers() {
     if (!map) return;
     people.forEach(person => {
@@ -64,15 +63,17 @@ function initMarkers() {
 // TIMED LINEAR INTERPOLATION ENGINE
 // ============================
 const PRE_SEQUENCE_DURATION = 12 * 1000; // 12 seconds standardized neutral baseline phase
-const DELAY_DURATION = 5 * 1000;         // 5 seconds delay before condition-specific movement
-const MOVE_DURATION = 15 * 1000;         // 15 seconds condition-specific movement phase
+const PAUSE_DURATION = 4 * 1000;         // 4 seconds pause after baseline
+const MOVE_DURATION = 12 * 1000;         // 12 seconds movement phase to come together
+const POST_JOIN_DURATION = 12 * 1000;    // 12 seconds post-join small independent movements
+// Total map procedure duration: 12 + 4 + 12 + 12 = 40 seconds
 let startTime = null;
 
 const startG = positions.leftNode;
 const startM = positions.rightNode;
 const startMain = positions.mainNode;
 
-// Condition 1 Specific Target Calculations: Meeting behavior (Coordination/Affiliation)
+// Target calculations for meeting behavior
 const midLng = (startG[0] + startM[0]) / 2;
 const midLat = (startG[1] + startM[1]) / 2; 
 const offsetPercent = 0.04; 
@@ -82,11 +83,19 @@ const deltaLat = startM[1] - startG[1];
 const targetG = [midLng - (deltaLng * offsetPercent), midLat - (deltaLat * offsetPercent)];
 const targetM = [midLng + (deltaLng * offsetPercent), midLat + (deltaLat * offsetPercent)];
 
-// ============================
-// STANDARDIZED NEUTRAL BASELINE CONFIGURATION (0-12s)
-// ============================
-// Bounded drift radius ensures nodes stay practically in the same spot while showing live movement.
+// Standardized neutral baseline parameters
 const BASELINE_DRIFT_RADIUS = 0.0005; 
+
+// Calculate exact coordinates at t = 12s to ensure seamless transitions without spatial snapping
+const finalDriftG_X = Math.sin(PRE_SEQUENCE_DURATION / 1800) * BASELINE_DRIFT_RADIUS;
+const finalDriftG_Y = Math.cos(PRE_SEQUENCE_DURATION / 2700) * (BASELINE_DRIFT_RADIUS * 0.8);
+const finalDriftM_X = Math.cos(PRE_SEQUENCE_DURATION / 2200) * BASELINE_DRIFT_RADIUS;
+const finalDriftM_Y = Math.sin(PRE_SEQUENCE_DURATION / 3100) * (BASELINE_DRIFT_RADIUS * 0.8);
+
+const holdG_Lng = startG[0] + finalDriftG_X;
+const holdG_Lat = startG[1] + finalDriftG_Y;
+const holdM_Lng = startM[0] + finalDriftM_X;
+const holdM_Lat = startM[1] + finalDriftM_Y;
 
 function animateNodes(timestamp) {
     if (!animationStarted) return;
@@ -97,15 +106,10 @@ function animateNodes(timestamp) {
 
     if (elapsed < PRE_SEQUENCE_DURATION) {
         // =========================================================================
-        // STANDARDIZED NEUTRAL BASELINE PHASE (0 - 12 Seconds)
-        // =========================================================================
-        // - Asynchronous localized drift around initial anchors.
-        // - At exactly t = PRE_SEQUENCE_DURATION, sine/cosine naturally loop close to zero
-        //   or are smoothly overridden by the linear interpolation in the next block.
+        // PHASE 1: STANDARDIZED NEUTRAL BASELINE PHASE (0 - 12 Seconds)
         // =========================================================================
         const driftG_X = Math.sin(elapsed / 1800) * BASELINE_DRIFT_RADIUS;
         const driftG_Y = Math.cos(elapsed / 2700) * (BASELINE_DRIFT_RADIUS * 0.8);
-        
         const driftM_X = Math.cos(elapsed / 2200) * BASELINE_DRIFT_RADIUS;
         const driftM_Y = Math.sin(elapsed / 3100) * (BASELINE_DRIFT_RADIUS * 0.8);
 
@@ -114,31 +118,51 @@ function animateNodes(timestamp) {
         currentM_Lng = startM[0] + driftM_X;
         currentM_Lat = startM[1] + driftM_Y;
 
+    } else if (elapsed < (PRE_SEQUENCE_DURATION + PAUSE_DURATION)) {
+        // =========================================================================
+        // PHASE 2: PAUSE / WAITING PHASE (12 - 16 Seconds)
+        // =========================================================================
+        // Hold at the exact final baseline position during the pause window
+        currentG_Lng = holdG_Lng;
+        currentG_Lat = holdG_Lat;
+        currentM_Lng = holdM_Lng;
+        currentM_Lat = holdM_Lat;
+
+    } else if (elapsed < (PRE_SEQUENCE_DURATION + PAUSE_DURATION + MOVE_DURATION)) {
+        // =========================================================================
+        // PHASE 3: MOVEMENT PHASE TO COME TOGETHER (16 - 28 Seconds)
+        // =========================================================================
+        const moveElapsed = elapsed - (PRE_SEQUENCE_DURATION + PAUSE_DURATION);
+        const progress = Math.min(moveElapsed / MOVE_DURATION, 1);
+        
+        currentG_Lng = holdG_Lng + (targetG[0] - holdG_Lng) * progress;
+        currentG_Lat = holdG_Lat + (targetG[1] - holdG_Lat) * progress;
+        currentM_Lng = holdM_Lng + (targetM[0] - holdM_Lng) * progress;
+        currentM_Lat = holdM_Lat + (targetM[1] - holdM_Lat) * progress;
+
     } else {
         // =========================================================================
-        // CONDITION 1 SPECIFIC MANIPULATION PHASE (12s+ onwards)
+        // PHASE 4: POST-JOIN SMALL INDEPENDENT MOVEMENTS (28 - 40 Seconds)
         // =========================================================================
-        const mainElapsed = elapsed - PRE_SEQUENCE_DURATION;
-        let progress = 0;
-        if (mainElapsed < DELAY_DURATION) {
-            progress = 0;
-        } else { 
-            const moveElapsed = mainElapsed - DELAY_DURATION; 
-            progress = Math.min(moveElapsed / MOVE_DURATION, 1); 
-        }
-        
-        // Exact linear interpolation from starting anchor to the condition target
-        currentG_Lng = startG[0] + (targetG[0] - startG[0]) * progress;
-        currentG_Lat = startG[1] + (targetG[1] - startG[1]) * progress;
-        currentM_Lng = startM[0] + (targetM[0] - startM[0]) * progress;
-        currentM_Lat = startM[1] + (targetM[1] - startM[1]) * progress;
+        // Agents maintain proximity at their final target coordinates while performing small local drifts
+        const postJoinElapsed = elapsed - (PRE_SEQUENCE_DURATION + PAUSE_DURATION + MOVE_DURATION);
+        const postDriftG_X = Math.sin(postJoinElapsed / 1500) * (BASELINE_DRIFT_RADIUS * 0.6);
+        const postDriftG_Y = Math.cos(postJoinElapsed / 2000) * (BASELINE_DRIFT_RADIUS * 0.6);
+        const postDriftM_X = Math.cos(postJoinElapsed / 1700) * (BASELINE_DRIFT_RADIUS * 0.6);
+        const postDriftM_Y = Math.sin(postJoinElapsed / 2300) * (BASELINE_DRIFT_RADIUS * 0.6);
+
+        currentG_Lng = targetG[0] + postDriftG_X;
+        currentG_Lat = targetG[1] + postDriftG_Y;
+        currentM_Lng = targetM[0] + postDriftM_X;
+        currentM_Lat = targetM[1] + postDriftM_Y;
     }
 
     if (markerInstances["leftNode"]) markerInstances["leftNode"].setLngLat([currentG_Lng, currentG_Lat]);
+    if (markerInstances["rightNode"]) markerInstances["rightNode"].setLngLat([currentM_Lng, currentM_Lng ? currentM_Lat : targetM[1]]); // Safely updating coordinates
     if (markerInstances["rightNode"]) markerInstances["rightNode"].setLngLat([currentM_Lng, currentM_Lat]);
     
-    // Continue loop until the total duration finishes
-    if (elapsed < (PRE_SEQUENCE_DURATION + DELAY_DURATION + MOVE_DURATION)) {
+    // Continue loop until total 40-second duration finishes
+    if (elapsed < (PRE_SEQUENCE_DURATION + PAUSE_DURATION + MOVE_DURATION + POST_JOIN_DURATION)) {
         requestAnimationFrame(animateNodes);
     } else {
         setTimeout(() => {
