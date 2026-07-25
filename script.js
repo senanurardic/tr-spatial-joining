@@ -63,15 +63,16 @@ function initMarkers() {
 // ============================
 // TIMED LINEAR INTERPOLATION ENGINE
 // ============================
-const PRE_SEQUENCE_DURATION = 30 * 1000; 
-const DELAY_DURATION = 5 * 1000;         
-const MOVE_DURATION = 15 * 1000; // 15 saniyeye düşürüldü       
+const PRE_SEQUENCE_DURATION = 12 * 1000; // 12 seconds standardized neutral baseline phase
+const DELAY_DURATION = 5 * 1000;         // 5 seconds delay before condition-specific movement
+const MOVE_DURATION = 15 * 1000;         // 15 seconds condition-specific movement phase
 let startTime = null;
 
 const startG = positions.leftNode;
 const startM = positions.rightNode;
 const startMain = positions.mainNode;
 
+// Condition 1 Specific Target Calculations: Meeting behavior (Coordination/Affiliation)
 const midLng = (startG[0] + startM[0]) / 2;
 const midLat = (startG[1] + startM[1]) / 2; 
 const offsetPercent = 0.04; 
@@ -80,24 +81,12 @@ const deltaLat = startM[1] - startG[1];
 
 const targetG = [midLng - (deltaLng * offsetPercent), midLat - (deltaLat * offsetPercent)];
 const targetM = [midLng + (deltaLng * offsetPercent), midLat + (deltaLat * offsetPercent)];
-const stepLng = 0.0025; const stepLat = 0.0018;
 
-// Vectors
-const gToMLng = startM[0] - startG[0]; const gToMLat = startM[1] - startG[1];
-const gDistToM = Math.sqrt(gToMLng * gToMLng + gToMLat * gToMLat);
-const gStepToMLng = (gToMLng / gDistToM) * stepLng * 1.5; const gStepToMLat = (gToMLat / gDistToM) * stepLat * 1.5;
-
-const gToMainLng = startMain[0] - startG[0]; const gToMainLat = startMain[1] - startG[1];
-const gDistToMain = Math.sqrt(gToMainLng * gToMainLng + gToMainLat * gToMainLat);
-const gStepToMainLng = (gToMainLng / gDistToMain) * stepLng * 1.5; const gStepToMainLat = (gToMainLat / gDistToMain) * stepLat * 1.5;
-
-const mToGLng = startG[0] - startM[0]; const mToGLat = startG[1] - startM[1];
-const mDistToG = Math.sqrt(mToGLng * mToGLng + mToGLat * mToGLat);
-const mStepToGLng = (mToGLng / mDistToG) * stepLng * 1.5; const mStepToGLat = (mToGLat / mDistToG) * stepLat * 1.5;
-
-const mToMainLng = startMain[0] - startM[0]; const mToMainLat = startMain[1] - startM[1];
-const mDistToMain = Math.sqrt(mToMainLng * mToMainLng + mToMainLat * mToMainLat);
-const mStepToMainLng = (mToMainLng / mDistToMain) * stepLng * 1.5; const mStepToMainLat = (mToMainLat / mDistToMain) * stepLat * 1.5;
+// ============================
+// STANDARDIZED NEUTRAL BASELINE CONFIGURATION (0-12s)
+// ============================
+// Bounded drift radius ensures nodes stay practically in the same spot while showing live movement.
+const BASELINE_DRIFT_RADIUS = 0.0005; 
 
 function animateNodes(timestamp) {
     if (!animationStarted) return;
@@ -107,33 +96,38 @@ function animateNodes(timestamp) {
     let currentM_Lng = startM[0]; let currentM_Lat = startM[1];
 
     if (elapsed < PRE_SEQUENCE_DURATION) {
-        // Choreography Logic (maintained)
-        if (elapsed < 3000) { currentG_Lng = startG[0]; currentG_Lat = startG[1]; } 
-        else if (elapsed < 7000) { const p = (elapsed - 3000) / 4000; currentG_Lng = startG[0] + (gStepToMainLng * p); currentG_Lat = startG[1] + (gStepToMainLat * p); } 
-        else if (elapsed < 8000) { currentG_Lng = startG[0] + gStepToMainLng; currentG_Lat = startG[1] + gStepToMainLat; }
-        else if (elapsed < 12000) { const p = (elapsed - 8000) / 4000; currentG_Lng = (startG[0] + gStepToMainLng) - (gStepToMainLng * p); currentG_Lat = (startG[1] + gStepToMainLat) - (gStepToMainLat * p); }
-        else if (elapsed < 14000) { currentG_Lng = startG[0]; currentG_Lat = startG[1]; }
-        else if (elapsed < 18000) { const p = (elapsed - 14000) / 4000; currentG_Lng = startG[0] + (gStepToMLng * p); currentG_Lat = startG[1] + (gStepToMLat * p); }
-        else if (elapsed < 22000) { const p = (elapsed - 18000) / 4000; currentG_Lng = (startG[0] + gStepToMLng) - (gStepToMLng * p); currentG_Lat = (startG[1] + gStepToMLat) - (gStepToMLat * p); }
-        else if (elapsed < 26000) { const p = (elapsed - 22000) / 4000; currentG_Lng = startG[0] - (stepLng * p); currentG_Lat = startG[1]; }
-        else { const p = (elapsed - 26000) / 4000; currentG_Lng = (startG[0] - stepLng) + (stepLng * p); currentG_Lat = startG[1]; }
+        // =========================================================================
+        // STANDARDIZED NEUTRAL BASELINE PHASE (0 - 12 Seconds)
+        // =========================================================================
+        // - Asynchronous localized drift around initial anchors.
+        // - At exactly t = PRE_SEQUENCE_DURATION, sine/cosine naturally loop close to zero
+        //   or are smoothly overridden by the linear interpolation in the next block.
+        // =========================================================================
+        const driftG_X = Math.sin(elapsed / 1800) * BASELINE_DRIFT_RADIUS;
+        const driftG_Y = Math.cos(elapsed / 2700) * (BASELINE_DRIFT_RADIUS * 0.8);
+        
+        const driftM_X = Math.cos(elapsed / 2200) * BASELINE_DRIFT_RADIUS;
+        const driftM_Y = Math.sin(elapsed / 3100) * (BASELINE_DRIFT_RADIUS * 0.8);
 
-        if (elapsed < 3000) { currentM_Lng = startM[0]; currentM_Lat = startM[1]; }
-        else if (elapsed < 6000) { const p = (elapsed - 3000) / 3000; currentM_Lng = startM[0]; currentM_Lat = startM[1] + (stepLat * p); }
-        else if (elapsed < 8000) { currentM_Lng = startM[0]; currentM_Lat = startM[1] + stepLat; }
-        else if (elapsed < 11000) { const p = (elapsed - 8000) / 3000; currentM_Lng = startM[0]; currentM_Lat = (startM[1] + stepLat) - (stepLat * p); }
-        else if (elapsed < 13000) { currentM_Lng = startM[0]; currentM_Lat = startM[1]; }
-        else if (elapsed < 17000) { const p = (elapsed - 13000) / 4000; currentM_Lng = startM[0] + (mStepToGLng * p); currentM_Lat = startM[1] + (mStepToGLat * p); }
-        else if (elapsed < 21000) { const p = (elapsed - 17000) / 4000; currentM_Lng = (startM[0] + mStepToGLng) - (mStepToGLng * p); currentM_Lat = (startM[1] + mStepToGLat) - (mStepToGLat * p); }
-        else if (elapsed < 25000) { const p = (elapsed - 21000) / 4000; currentM_Lng = startM[0] + (mStepToMainLng * p); currentM_Lat = startM[1] + (mStepToMainLat * p); }
-        else if (elapsed < 26000) { currentM_Lng = startM[0] + mStepToMainLng; currentM_Lat = startM[1] + mStepToMainLat; }
-        else { const p = (elapsed - 26000) / 4000; currentM_Lng = (startM[0] + mStepToMainLng) - (mStepToMainLng * p); currentM_Lat = (startM[1] + mStepToMainLat) - (mStepToMainLat * p); }
+        currentG_Lng = startG[0] + driftG_X;
+        currentG_Lat = startG[1] + driftG_Y;
+        currentM_Lng = startM[0] + driftM_X;
+        currentM_Lat = startM[1] + driftM_Y;
 
     } else {
+        // =========================================================================
+        // CONDITION 1 SPECIFIC MANIPULATION PHASE (12s+ onwards)
+        // =========================================================================
         const mainElapsed = elapsed - PRE_SEQUENCE_DURATION;
         let progress = 0;
-        if (mainElapsed < DELAY_DURATION) progress = 0;
-        else { const moveElapsed = mainElapsed - DELAY_DURATION; progress = Math.min(moveElapsed / MOVE_DURATION, 1); }
+        if (mainElapsed < DELAY_DURATION) {
+            progress = 0;
+        } else { 
+            const moveElapsed = mainElapsed - DELAY_DURATION; 
+            progress = Math.min(moveElapsed / MOVE_DURATION, 1); 
+        }
+        
+        // Exact linear interpolation from starting anchor to the condition target
         currentG_Lng = startG[0] + (targetG[0] - startG[0]) * progress;
         currentG_Lat = startG[1] + (targetG[1] - startG[1]) * progress;
         currentM_Lng = startM[0] + (targetM[0] - startM[0]) * progress;
@@ -143,16 +137,15 @@ function animateNodes(timestamp) {
     if (markerInstances["leftNode"]) markerInstances["leftNode"].setLngLat([currentG_Lng, currentG_Lat]);
     if (markerInstances["rightNode"]) markerInstances["rightNode"].setLngLat([currentM_Lng, currentM_Lat]);
     
-    // GÜNCELLEME: Tüm animasyon süresi tamamlandığında Qualtrics'i ilerlet
+    // Continue loop until the total duration finishes
     if (elapsed < (PRE_SEQUENCE_DURATION + DELAY_DURATION + MOVE_DURATION)) {
         requestAnimationFrame(animateNodes);
     } else {
-        // Manipülasyon (Buluşma hareketleri) bittiği an çalışan güvenli yönlendirme bloğu
         setTimeout(() => {
             if (window.parent) {
                 window.parent.postMessage("mapAnimationFinished", "*");
             }
-        }, 1000); // Son kareyi 1 saniye ekranda tutup ardından Qualtrics'i tetikler
+        }, 1000); 
     }
 }
 
@@ -200,10 +193,8 @@ if (nicknameInput) {
     nicknameInput.addEventListener("keypress", (e) => { if (e.key === "Enter") handleLoginSubmit(); });
 }
 
-// 1. KİLİTLENMEYİ ENGELLEYEN ADIM: Deney akışı haritayı beklemeden anında başlar
 startExperimentFlow();
 
-// 2. KİLİTLENMEYİ ENGELLEYEN ADIM: Harita güvenli alanda yüklenir (Hata verse bile sayfa çökmez)
 try {
     if (typeof maplibregl !== 'undefined') {
         map = new maplibregl.Map({
@@ -222,5 +213,5 @@ try {
         });
     }
 } catch (e) {
-    console.error("Harita kütüphanesi yükleme engeli:", e);
+    console.error("Map library loading error:", e);
 }
