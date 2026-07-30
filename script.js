@@ -18,6 +18,16 @@ const people = [
     { id: "mainNode", markerType: "blue-pulse-dot" }
 ];
 
+// ============================================================================
+// SHARED CROSS-CONDITION MOVEMENT CONFIG
+// Bu blok Control ve Coordination dosyalarındaki ile birebir aynı olmalı.
+// Faz 3 (16-28s) yaklaşma hızı burada zaten doğru: her ajan gerçek G-M
+// mesafesinin (0.5 - offsetPercent) kadarını (≈524.06m) 12 saniyede kat ediyor
+// → ≈43.67 m/s. Bu, Control dosyasındaki büyütülmüş orbit yarıçapıyla (≈182m)
+// eşleşiyor. Bu koşulda DEĞİŞİKLİK GEREKMİYOR.
+// ============================================================================
+const SHARED_APPROACH_PHASE_DURATION_MS = 12000; // 16-28s penceresi, tüm koşullarda aynı
+
 function createMarkerElement(person) {
     const clusterEl = document.createElement("div");
     clusterEl.className = "marker-cluster";
@@ -36,14 +46,18 @@ function createMarkerElement(person) {
         agentEl.appendChild(mapsDotContainer);
         const labelEl = document.createElement("div");
         labelEl.className = "agent-label";
-        labelEl.textContent = userNickname || "User";
+        labelEl.textContent = userNickname || "Kullanıcı";
         agentEl.appendChild(labelEl);
+        agentEl.setAttribute("role", "img");
+        agentEl.setAttribute("aria-label", (userNickname || "Kullanıcı") + " konumu, harita üzerinde");
     } 
     else if (person.markerType === "grey-letter-dot") {
         const greyDot = document.createElement("div");
         greyDot.className = "experimental-grey-letter-dot";
         greyDot.textContent = person.initial;
         agentEl.appendChild(greyDot);
+        agentEl.setAttribute("role", "img");
+        agentEl.setAttribute("aria-label", "Katılımcı " + person.initial + " konumu, harita üzerinde");
     }
     clusterEl.appendChild(agentEl);
     return clusterEl;
@@ -60,13 +74,14 @@ function initMarkers() {
 }
 
 // ============================
-// TIMED LINEAR INTERPOLATION ENGINE
+// TIMED LINEAR INTERPOLATION ENGINE (JOINING CONDITION - SPATIAL JOINING ONLY)
 // ============================
 const PRE_SEQUENCE_DURATION = 12 * 1000; // 12 seconds standardized neutral baseline phase
 const PAUSE_DURATION = 4 * 1000;         // 4 seconds pause after baseline
 const MOVE_DURATION = 12 * 1000;         // 12 seconds movement phase to come together
 const POST_JOIN_DURATION = 12 * 1000;    // 12 seconds post-join small independent movements
-// Total map procedure duration: 12 + 4 + 12 + 12 = 40 seconds
+const TOTAL_ANIMATION_DURATION = PRE_SEQUENCE_DURATION + PAUSE_DURATION + MOVE_DURATION + POST_JOIN_DURATION; // 40s
+const FINAL_HOLD_DURATION = 1000; // 40-41s: son karede bekleme
 let startTime = null;
 
 const startG = positions.leftNode;
@@ -105,9 +120,7 @@ function animateNodes(timestamp) {
     let currentM_Lng = startM[0]; let currentM_Lat = startM[1];
 
     if (elapsed < PRE_SEQUENCE_DURATION) {
-        // =========================================================================
         // PHASE 1: STANDARDIZED NEUTRAL BASELINE PHASE (0 - 12 Seconds)
-        // =========================================================================
         const driftG_X = Math.sin(elapsed / 1800) * BASELINE_DRIFT_RADIUS;
         const driftG_Y = Math.cos(elapsed / 2700) * (BASELINE_DRIFT_RADIUS * 0.8);
         const driftM_X = Math.cos(elapsed / 2200) * BASELINE_DRIFT_RADIUS;
@@ -119,19 +132,14 @@ function animateNodes(timestamp) {
         currentM_Lat = startM[1] + driftM_Y;
 
     } else if (elapsed < (PRE_SEQUENCE_DURATION + PAUSE_DURATION)) {
-        // =========================================================================
         // PHASE 2: PAUSE / WAITING PHASE (12 - 16 Seconds)
-        // =========================================================================
-        // Hold at the exact final baseline position during the pause window
         currentG_Lng = holdG_Lng;
         currentG_Lat = holdG_Lat;
         currentM_Lng = holdM_Lng;
         currentM_Lat = holdM_Lat;
 
     } else if (elapsed < (PRE_SEQUENCE_DURATION + PAUSE_DURATION + MOVE_DURATION)) {
-        // =========================================================================
         // PHASE 3: MOVEMENT PHASE TO COME TOGETHER (16 - 28 Seconds)
-        // =========================================================================
         const moveElapsed = elapsed - (PRE_SEQUENCE_DURATION + PAUSE_DURATION);
         const progress = Math.min(moveElapsed / MOVE_DURATION, 1);
         
@@ -141,10 +149,7 @@ function animateNodes(timestamp) {
         currentM_Lat = holdM_Lat + (targetM[1] - holdM_Lat) * progress;
 
     } else {
-        // =========================================================================
         // PHASE 4: POST-JOIN SMALL INDEPENDENT MOVEMENTS (28 - 40 Seconds)
-        // =========================================================================
-        // Agents maintain proximity at their final target coordinates while performing small local drifts
         const postJoinElapsed = elapsed - (PRE_SEQUENCE_DURATION + PAUSE_DURATION + MOVE_DURATION);
         const postDriftG_X = Math.sin(postJoinElapsed / 1500) * (BASELINE_DRIFT_RADIUS * 0.6);
         const postDriftG_Y = Math.cos(postJoinElapsed / 2000) * (BASELINE_DRIFT_RADIUS * 0.6);
@@ -158,21 +163,105 @@ function animateNodes(timestamp) {
     }
 
     if (markerInstances["leftNode"]) markerInstances["leftNode"].setLngLat([currentG_Lng, currentG_Lat]);
-    if (markerInstances["rightNode"]) markerInstances["rightNode"].setLngLat([currentM_Lng, currentM_Lng ? currentM_Lat : targetM[1]]); // Safely updating coordinates
+    // DÜZELTME: Önceki versiyonda burada anlamsız/ölü bir satır vardı
+    // (currentM_Lng ? currentM_Lat : targetM[1] üçlü operatörü hiçbir zaman
+    // gerçek bir dallanma yaratmıyordu, ardından hemen doğru değerle
+    // üzerine yazılıyordu). Tek ve doğru çağrı bırakıldı:
     if (markerInstances["rightNode"]) markerInstances["rightNode"].setLngLat([currentM_Lng, currentM_Lat]);
-    
-    // Continue loop until total 40-second duration finishes
-    if (elapsed < (PRE_SEQUENCE_DURATION + PAUSE_DURATION + MOVE_DURATION + POST_JOIN_DURATION)) {
+
+    if (elapsed < TOTAL_ANIMATION_DURATION) {
         requestAnimationFrame(animateNodes);
     } else {
         setTimeout(() => {
-            if (window.parent) {
-                window.parent.postMessage("mapAnimationFinished", "*");
-            }
-        }, 1000); 
+            sendCompletionSignal("normal");
+        }, FINAL_HOLD_DURATION);
     }
 }
 
+// ============================================================================
+// QUALTRICS HANDSHAKE (otomatik yönlendirme + alım onayı kaydı)
+// ============================================================================
+const SESSION_ID = "sess_" + Date.now() + "_" + Math.random().toString(36).slice(2, 9);
+let qualtricsAckReceived = false;
+let hasSentCompletion = false;
+let handshakeIntervalId = null;
+
+function sendCompletionSignal(reason) {
+    if (hasSentCompletion) return;
+    hasSentCompletion = true;
+
+    const payload = {
+        type: "MAP_ANIMATION_COMPLETE",
+        sessionId: SESSION_ID,
+        reason: reason,          // "normal" | "timeout" | "map-load-failed" | "manual-fallback"
+        nickname: userNickname,
+        timestamp: Date.now()
+    };
+
+    let attempts = 0;
+    const MAX_ATTEMPTS = 15;
+    handshakeIntervalId = setInterval(() => {
+        attempts++;
+        try {
+            if (window.parent) window.parent.postMessage(payload, "*");
+        } catch (e) {
+            console.warn("postMessage gönderilemedi:", e);
+        }
+        if (qualtricsAckReceived || attempts >= MAX_ATTEMPTS) {
+            clearInterval(handshakeIntervalId);
+            if (!qualtricsAckReceived) {
+                console.warn("Qualtrics'ten onay (ack) alınamadı. Manuel devam butonu gösteriliyor.");
+                showManualContinueFallback();
+            }
+        }
+    }, 400);
+}
+
+window.addEventListener("message", (event) => {
+    if (event.data && event.data.type === "MAP_ANIMATION_ACK" && event.data.sessionId === SESSION_ID) {
+        qualtricsAckReceived = true;
+    }
+});
+
+function showManualContinueFallback() {
+    if (document.getElementById("manual-continue-fallback")) return;
+    const wrap = document.createElement("div");
+    wrap.id = "manual-continue-fallback";
+    wrap.setAttribute("role", "alert");
+    wrap.style.cssText = "position:fixed;bottom:20px;left:50%;transform:translateX(-50%);" +
+        "background:#fff;border:1px solid #ccc;border-radius:8px;padding:14px 18px;" +
+        "box-shadow:0 2px 10px rgba(0,0,0,0.15);z-index:9999;text-align:center;font-family:sans-serif;";
+    wrap.innerHTML = '<p style="margin:0 0 10px 0;">Bu bölüm tamamlandı. Devam etmek için lütfen aşağıdaki butona tıklayın.</p>';
+    const btn = document.createElement("button");
+    btn.textContent = "Devam Et";
+    btn.setAttribute("aria-label", "Ankete devam et");
+    btn.style.cssText = "padding:8px 20px;border:none;border-radius:6px;background:#2b6cb0;color:#fff;font-size:15px;cursor:pointer;";
+    btn.addEventListener("click", () => {
+        try {
+            if (window.parent) {
+                window.parent.postMessage({ type: "MAP_ANIMATION_COMPLETE", sessionId: SESSION_ID, reason: "manual-fallback", timestamp: Date.now() }, "*");
+            }
+        } catch (e) { /* yut */ }
+        wrap.remove();
+    });
+    wrap.appendChild(btn);
+    document.body.appendChild(wrap);
+}
+
+// ============================================================================
+// MAKSİMUM TIMEOUT (katılımcı asla takılı kalmasın)
+// ============================================================================
+const MAX_EXPERIMENT_TIMEOUT_MS = 90 * 1000;
+setTimeout(() => {
+    if (!hasSentCompletion) {
+        console.warn("Maksimum süre aşıldı, katılımcı otomatik olarak ilerletiliyor.");
+        sendCompletionSignal("timeout");
+    }
+}, MAX_EXPERIMENT_TIMEOUT_MS);
+
+// ============================
+// EXPERIMENT FLOW ENGINE
+// ============================
 const flowScreen = document.getElementById("experiment-flow-screen");
 const stepConnecting = document.getElementById("step-connecting");
 const stepWaiting = document.getElementById("step-waiting");
@@ -198,8 +287,8 @@ function startExperimentFlow() {
 }
 
 function handleLoginSubmit() {
-    const val = nicknameInput ? nicknameInput.value.trim() : "User";
-    if (val === "") { alert("Please enter a valid nickname."); return; }
+    const val = nicknameInput ? nicknameInput.value.trim() : "Katılımcı";
+    if (val === "") { alert("Lütfen geçerli bir takma ad girin."); return; }
     userNickname = val;
     if (flowScreen) {
         flowScreen.style.opacity = "0";
@@ -214,9 +303,54 @@ function handleLoginSubmit() {
 }
 if (submitBtn) submitBtn.addEventListener("click", handleLoginSubmit);
 if (nicknameInput) {
+    nicknameInput.setAttribute("aria-label", "Takma adınızı girin");
     nicknameInput.addEventListener("keypress", (e) => { if (e.key === "Enter") handleLoginSubmit(); });
 }
+if (submitBtn) {
+    submitBtn.setAttribute("aria-label", "Takma adı gönder ve devam et");
+}
 
+// ============================================================================
+// HARİTA YÜKLENEMEZSE AÇIK BİR FALLBACK
+// ============================================================================
+let mapHasLoaded = false;
+let mapLoadFallbackTriggered = false;
+
+function showMapLoadFallback() {
+    if (mapLoadFallbackTriggered) return;
+    mapLoadFallbackTriggered = true;
+
+    const mapContainer = document.getElementById("map");
+    if (mapContainer) mapContainer.style.visibility = "hidden";
+
+    const fallback = document.createElement("div");
+    fallback.id = "map-load-fallback";
+    fallback.setAttribute("role", "alert");
+    fallback.setAttribute("aria-live", "assertive");
+    fallback.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;" +
+        "display:flex;align-items:center;justify-content:center;background:#f7f7f7;" +
+        "font-family:sans-serif;text-align:center;padding:24px;box-sizing:border-box;z-index:5000;";
+    fallback.innerHTML =
+        '<div style="max-width:420px;">' +
+        '<p style="font-size:17px;color:#333;margin-bottom:8px;">Harita şu anda yüklenemedi.</p>' +
+        '<p style="font-size:14px;color:#666;">Bağlantınız kontrol ediliyor, lütfen bekleyiniz. Bu ekran otomatik olarak ilerleyecektir.</p>' +
+        "</div>";
+    document.body.appendChild(fallback);
+
+    if (!animationStarted) {
+        animationStarted = true;
+        setTimeout(() => {
+            sendCompletionSignal("map-load-failed");
+        }, TOTAL_ANIMATION_DURATION + FINAL_HOLD_DURATION);
+    }
+}
+
+const MAP_LOAD_TIMEOUT_MS = 8000;
+let mapLoadTimeoutId = null;
+
+// ============================
+// FAIL-SAFE INITIALIZATION BLOCK
+// ============================
 startExperimentFlow();
 
 try {
@@ -232,10 +366,28 @@ try {
             pixelRatio: window.devicePixelRatio || 2 
         });
 
+        mapLoadTimeoutId = setTimeout(() => {
+            if (!mapHasLoaded) {
+                console.warn("Harita belirlenen süre içinde yüklenmedi (timeout).");
+                showMapLoadFallback();
+            }
+        }, MAP_LOAD_TIMEOUT_MS);
+
         map.on('load', () => {
+            mapHasLoaded = true;
+            if (mapLoadTimeoutId) clearTimeout(mapLoadTimeoutId);
             map.getCanvas().style.filter = 'grayscale(0.6) contrast(1.1) brightness(0.95) hue-rotate(25deg)';
         });
+
+        map.on('error', (e) => {
+            console.error("Harita hata event'i:", e);
+            if (!mapHasLoaded) showMapLoadFallback();
+        });
+    } else {
+        console.warn("MapLibre CDN kütüphanesi yüklenemedi.");
+        showMapLoadFallback();
     }
-} catch (e) {
-    console.error("Map library loading error:", e);
+} catch (error) {
+    console.error("Harita başlatma hatası:", error);
+    showMapLoadFallback();
 }
