@@ -20,13 +20,13 @@ const people = [
 
 // ============================================================================
 // SHARED CROSS-CONDITION MOVEMENT CONFIG
-// Bu blok Control ve Coordination dosyalarındaki ile birebir aynı olmalı.
-// Faz 3 (16-28s) yaklaşma hızı burada zaten doğru: her ajan gerçek G-M
-// mesafesinin (0.5 - offsetPercent) kadarını (≈524.06m) 12 saniyede kat ediyor
-// → ≈43.67 m/s. Bu, Control dosyasındaki büyütülmüş orbit yarıçapıyla (≈182m)
-// eşleşiyor. Bu koşulda DEĞİŞİKLİK GEREKMİYOR.
+// This block should be identical to the one in the Control and Coordination
+// files. Phase 3 (16-28s) approach speed is already correct here: each agent
+// travels (0.5 - offsetPercent) of the real G-M distance (≈524.06m) in 12
+// seconds → ≈43.67 m/s. This matches Control's enlarged orbit radius (≈182m).
+// NO CHANGE NEEDED in this condition.
 // ============================================================================
-const SHARED_APPROACH_PHASE_DURATION_MS = 12000; // 16-28s penceresi, tüm koşullarda aynı
+const SHARED_APPROACH_PHASE_DURATION_MS = 12000; // 16-28s window, identical across all conditions
 
 function createMarkerElement(person) {
     const clusterEl = document.createElement("div");
@@ -81,7 +81,7 @@ const PAUSE_DURATION = 4 * 1000;         // 4 seconds pause after baseline
 const MOVE_DURATION = 12 * 1000;         // 12 seconds movement phase to come together
 const POST_JOIN_DURATION = 12 * 1000;    // 12 seconds post-join small independent movements
 const TOTAL_ANIMATION_DURATION = PRE_SEQUENCE_DURATION + PAUSE_DURATION + MOVE_DURATION + POST_JOIN_DURATION; // 40s
-const FINAL_HOLD_DURATION = 1000; // 40-41s: son karede bekleme
+const FINAL_HOLD_DURATION = 1000; // 40-41s: hold on the final frame
 let startTime = null;
 
 const startG = positions.leftNode;
@@ -163,10 +163,10 @@ function animateNodes(timestamp) {
     }
 
     if (markerInstances["leftNode"]) markerInstances["leftNode"].setLngLat([currentG_Lng, currentG_Lat]);
-    // DÜZELTME: Önceki versiyonda burada anlamsız/ölü bir satır vardı
-    // (currentM_Lng ? currentM_Lat : targetM[1] üçlü operatörü hiçbir zaman
-    // gerçek bir dallanma yaratmıyordu, ardından hemen doğru değerle
-    // üzerine yazılıyordu). Tek ve doğru çağrı bırakıldı:
+    // FIX: the previous version had a redundant/dead line here (a ternary
+    // `currentM_Lng ? currentM_Lat : targetM[1]` that never created a real
+    // branch, and was immediately overwritten by the correct value anyway).
+    // Only the single correct call remains:
     if (markerInstances["rightNode"]) markerInstances["rightNode"].setLngLat([currentM_Lng, currentM_Lat]);
 
     if (elapsed < TOTAL_ANIMATION_DURATION) {
@@ -179,7 +179,7 @@ function animateNodes(timestamp) {
 }
 
 // ============================================================================
-// QUALTRICS HANDSHAKE (otomatik yönlendirme + alım onayı kaydı)
+// QUALTRICS HANDSHAKE (auto-advance + receipt-acknowledgment logging)
 // ============================================================================
 const SESSION_ID = "sess_" + Date.now() + "_" + Math.random().toString(36).slice(2, 9);
 let qualtricsAckReceived = false;
@@ -205,12 +205,12 @@ function sendCompletionSignal(reason) {
         try {
             if (window.parent) window.parent.postMessage(payload, "*");
         } catch (e) {
-            console.warn("postMessage gönderilemedi:", e);
+            console.warn("postMessage failed:", e);
         }
         if (qualtricsAckReceived || attempts >= MAX_ATTEMPTS) {
             clearInterval(handshakeIntervalId);
             if (!qualtricsAckReceived) {
-                console.warn("Qualtrics'ten onay (ack) alınamadı. Manuel devam butonu gösteriliyor.");
+                console.warn("No acknowledgment (ack) received from Qualtrics. Showing manual continue button.");
                 showManualContinueFallback();
             }
         }
@@ -241,7 +241,7 @@ function showManualContinueFallback() {
             if (window.parent) {
                 window.parent.postMessage({ type: "MAP_ANIMATION_COMPLETE", sessionId: SESSION_ID, reason: "manual-fallback", timestamp: Date.now() }, "*");
             }
-        } catch (e) { /* yut */ }
+        } catch (e) { /* ignore */ }
         wrap.remove();
     });
     wrap.appendChild(btn);
@@ -249,12 +249,12 @@ function showManualContinueFallback() {
 }
 
 // ============================================================================
-// MAKSİMUM TIMEOUT (katılımcı asla takılı kalmasın)
+// MAXIMUM TIMEOUT (the participant should never remain stuck)
 // ============================================================================
 const MAX_EXPERIMENT_TIMEOUT_MS = 90 * 1000;
 setTimeout(() => {
     if (!hasSentCompletion) {
-        console.warn("Maksimum süre aşıldı, katılımcı otomatik olarak ilerletiliyor.");
+        console.warn("Maximum duration exceeded; auto-advancing the participant.");
         sendCompletionSignal("timeout");
     }
 }, MAX_EXPERIMENT_TIMEOUT_MS);
@@ -311,7 +311,7 @@ if (submitBtn) {
 }
 
 // ============================================================================
-// HARİTA YÜKLENEMEZSE AÇIK BİR FALLBACK
+// CLEAR FALLBACK IF THE MAP FAILS TO LOAD
 // ============================================================================
 let mapHasLoaded = false;
 let mapLoadFallbackTriggered = false;
@@ -368,7 +368,7 @@ try {
 
         mapLoadTimeoutId = setTimeout(() => {
             if (!mapHasLoaded) {
-                console.warn("Harita belirlenen süre içinde yüklenmedi (timeout).");
+                console.warn("Map did not load within the allotted time (timeout).");
                 showMapLoadFallback();
             }
         }, MAP_LOAD_TIMEOUT_MS);
@@ -380,14 +380,14 @@ try {
         });
 
         map.on('error', (e) => {
-            console.error("Harita hata event'i:", e);
+            console.error("Map error event:", e);
             if (!mapHasLoaded) showMapLoadFallback();
         });
     } else {
-        console.warn("MapLibre CDN kütüphanesi yüklenemedi.");
+        console.warn("MapLibre CDN library failed to load.");
         showMapLoadFallback();
     }
 } catch (error) {
-    console.error("Harita başlatma hatası:", error);
+    console.error("Map initialization failed:", error);
     showMapLoadFallback();
 }
