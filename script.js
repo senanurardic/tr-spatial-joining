@@ -8,16 +8,16 @@
  * To change a condition, edit ONLY the CONDITION BLOCK.
  *
  * Flow (t = 0 is the moment the participant submits their nickname):
- *   Block 0  0-4 s    Starting position, stable (idle GPS jitter only)
- *   Block 1  4-16 s   Synchronous approach: both agents walk in a straight
+ *   Block 0  0-6 s    Starting position, stable (idle GPS jitter only)
+ *   Block 1  6-18 s   Synchronous approach: both agents walk in a straight
  *                      line toward each other until they meet (12 s)
- *   Block 2  16-18 s  Both agents stop between blocks (2 s)
- *   Block 3  18-30 s  Asynchronous, independent movement (12 s), kept close
+ *   Block 2  18-20 s  Both agents stop between blocks (2 s)
+ *   Block 3  20-32 s  Asynchronous, independent movement (12 s), kept close
  *                      to the meeting point -- see the CONDITION BLOCK for
  *                      why this is a smaller loop than IM's, not a literal
  *                      reuse of IM's Block 3 schedule.
- *   Block 4  30-33 s  Both agents remain stationary before hand-back to survey
- *   Total sequence: 33 s.
+ *   Block 4  32-35 s  Both agents remain stationary before hand-back to survey
+ *   Total sequence: 35 s.
  *
  * Design constraints (identical in every condition, verified numerically):
  *   - Walking speed 1.5 m/s (5.4 km/h), pedestrian pace, identical in every
@@ -120,7 +120,7 @@ const MAP_CENTER = [32.870379, 39.921936]; // Ankara -- set with placement-tool.
 const SCENE_ROTATION_DEG = 55;
 
 function rot(bearingDeg) { return (bearingDeg + SCENE_ROTATION_DEG + 360) % 360; }
-const MAP_ZOOM = 18.0;                     // locked (min = max = 18.0), 0.458 m/pixel
+const MAP_ZOOM = 18.5;                     // locked (min = max = 18.0), 0.458 m/pixel
 
 const WALK_SPEED_MPS = 1.5;                // 5.4 km/h -- normal walking pace
 
@@ -130,11 +130,11 @@ const WALK_SPEED_MPS = 1.5;                // 5.4 km/h -- normal walking pace
 // stop-between-blocks pause; Block 4 is the final stationary hold before
 // hand-back to the survey. Every boundary is a whole number of GPS fixes.
 const T_STABLE = 6000;   //  0 -  6 s   idle GPS jitter, agents at start position
-const T_BLOCK1 = 12000;  //  4 - 16 s   Block 1 movement (in SCHEDULE_*)
-const T_BLOCK2 =  2000;  // 16 - 18 s   both agents stationary (in SCHEDULE_*)
-const T_BLOCK3 = 12000;  // 18 - 30 s   Block 3 movement (in SCHEDULE_*)
-const T_BLOCK4 =  3000;  // 30 - 33 s   final stationary hold, then hand-back
-const TOTAL_ANIMATION_DURATION = T_STABLE + T_BLOCK1 + T_BLOCK2 + T_BLOCK3 + T_BLOCK4; // 33000
+const T_BLOCK1 = 12000;  //  6 - 18 s   Block 1 movement (in SCHEDULE_*)
+const T_BLOCK2 =  2000;  // 18 - 20 s   both agents stationary (in SCHEDULE_*)
+const T_BLOCK3 = 12000;  // 20 - 32 s   Block 3 movement (in SCHEDULE_*)
+const T_BLOCK4 =  3000;  // 32 - 35 s   final stationary hold, then hand-back
+const TOTAL_ANIMATION_DURATION = T_STABLE + T_BLOCK1 + T_BLOCK2 + T_BLOCK3 + T_BLOCK4; // 35000
 const FINAL_HOLD_DURATION = 0; // Block 4 above already is the final hold
 
 const EARTH_RADIUS_M = 6378137;
