@@ -120,7 +120,7 @@ const MAP_CENTER = [32.870379, 39.921936]; // Ankara -- set with placement-tool.
 const SCENE_ROTATION_DEG = 55;
 
 function rot(bearingDeg) { return (bearingDeg + SCENE_ROTATION_DEG + 360) % 360; }
-const MAP_ZOOM = 18.5;                     // locked (min = max = 18.0), 0.458 m/pixel
+const MAP_ZOOM = 18.0;                     // locked (min = max = 18.0), 0.458 m/pixel
 
 const WALK_SPEED_MPS = 1.5;                // 5.4 km/h -- normal walking pace
 
