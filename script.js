@@ -247,14 +247,14 @@ function jitterMeters(who, tSec, amplitude) {
     const dy = (Math.sin(tSec * j.fy1 + j.py1) * 0.6 + Math.sin(tSec * j.fy2 + j.py2) * 0.4) * amplitude;
     return [dx, dy];
 }
-const JITTER_IDLE_M = 2.0;   // during the stable window (Block 0)
+const JITTER_IDLE_M = 0.0;   // during the stable window (Block 0)
 const JITTER_MOVE_M = 0.5;   // while walking, so paths are not perfectly straight
 const JITTER_RAMP_MS = 2000; // amplitude eases between the two, never steps --
                               // a step would teleport the marker and register
                               // as a large instantaneous speed spike.
 function jitterAmplitude(elapsedMs) {
     const moveStart = T_STABLE;
-    const a = moveStart - JITTER_RAMP_MS / 2, b = moveStart + JITTER_RAMP_MS / 2;
+    const a = moveStart / 2, b = moveStart + JITTER_RAMP_MS / 2;
     if (elapsedMs <= a) return JITTER_IDLE_M;
     if (elapsedMs >= b) return JITTER_MOVE_M;
     const ease = 0.5 - 0.5 * Math.cos(Math.PI * (elapsedMs - a) / JITTER_RAMP_MS);
