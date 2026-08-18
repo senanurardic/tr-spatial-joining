@@ -47,17 +47,15 @@ const CONDITION_LABEL = "Spatial Joining";
 // two points on opposite sides of the same hub).
 // Each agent walks 15.0 m (10 s at 1.5 m/s) with two independent 1 s
 // pauses, for a 12 s block.
-// G's pauses fall at local t = 4-5 s and 9-10 s.
+// G's pauses fall at local t = 1-2 s and 7-8 s.
 const SCHEDULE_G_BLOCK1 = [
-    { d: 4, b: 75 }, { d: 1, b: null }, { d: 4, b: 75 },
-    { d: 1, b: null }, { d: 2, b: 75 }
+    { d: 1, b: 75 }, { d: 1, b: null }, { d: 5, b: 75 },
+    { d: 1, b: null }, { d: 4, b: 75 }
 ];
-// M's pauses fall at local t = 3-4 s and 8-9 s -- never the same second as
-// G's, so the pausing itself still reads as independent even though the
-// overall approach is synchronous/linear.
+// M's pauses fall at local t = 4-5 s and 10-11 s.
 const SCHEDULE_M_BLOCK1 = [
-    { d: 3, b: 255 }, { d: 1, b: null }, { d: 4, b: 255 },
-    { d: 1, b: null }, { d: 3, b: 255 }
+    { d: 4, b: 255 }, { d: 1, b: null }, { d: 5, b: 255 },
+    { d: 1, b: null }, { d: 1, b: 255 }
 ];
 
 // -- Block 2 (both agents fully stationary for 2 s) ------------------------
@@ -71,8 +69,8 @@ const SCHEDULE_BLOCK2_PAUSE = [{ d: 2, b: null }];
 //     sustained "following" or "fleeing" read).
 //   - The two long-leg axes are ~75 deg apart from each other (345/165 deg vs
 //     30/210 deg on screen), so the two paths look structurally different.
-//   - Pause positions never coincide between G and M (G: local t=1-2 s, 7-8 s;
-//     M: local t=4-5 s, 10-11 s), reinforcing independent rhythm.
+//   - Pause positions never coincide between G and M (G: local t=4-5 s, 10-11 s;
+//     M: local t=1-2 s, 7-8 s), reinforcing independent rhythm.
 // Bearings are verified numerically: 0 shared-bearing events, 0 sustained
 // follow events, G-M stays 9.1-15.7 m throughout Block 3 (no near-merge,
 // no large separation), and both agents return to the meeting point (net=0).
@@ -81,18 +79,18 @@ const SCHEDULE_BLOCK2_PAUSE = [{ d: 2, b: null }];
 //    ~toward M) walks only 1.5 m toward M before the pause -- too brief to
 //    read as approach; the long leg (4 s, screen 345 deg = NNW) then pulls
 //    away perpendicularly. Return pair mirrors exactly, closing the loop.
-// G's pauses fall at local t = 1-2 s and 7-8 s.
+// G's pauses fall at local t = 4-5 s and 10-11 s.
 const SCHEDULE_G_BLOCK3 = [
-    { d: 1, b: 20 }, { d: 1, b: null }, { d: 4, b: 290 },
-    { d: 1, b: 200 }, { d: 1, b: null }, { d: 4, b: 110 }
+    { d: 4, b: 290 }, { d: 1, b: null }, { d: 1, b: 20 },
+    { d: 4, b: 110 }, { d: 1, b: null }, { d: 1, b: 200 }
 ];
 // M: same 4-leg structure, long-leg axis rotated 75 deg from G's (screen 30/210 deg
 //    vs G's 345/165 deg). From a viewer's perspective, G wanders mostly NNW/SSE while
 //    M wanders mostly NNE/SSW -- clearly different directions, no shared rhythm.
-// M's pauses fall at local t = 4-5 s and 10-11 s.
+// M's pauses fall at local t = 1-2 s and 7-8 s.
 const SCHEDULE_M_BLOCK3 = [
-    { d: 4, b: 335 }, { d: 1, b: null }, { d: 1, b: 65 },
-    { d: 4, b: 155 }, { d: 1, b: null }, { d: 1, b: 245 }
+    { d: 1, b: 65 }, { d: 1, b: null }, { d: 4, b: 335 },
+    { d: 1, b: 245 }, { d: 1, b: null }, { d: 4, b: 155 }
 ];
 
 const SCHEDULE_G = SCHEDULE_G_BLOCK1.concat(SCHEDULE_BLOCK2_PAUSE, SCHEDULE_G_BLOCK3);
