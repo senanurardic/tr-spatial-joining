@@ -39,58 +39,22 @@ const CONDITION = "SJ";
 const CONDITION_LABEL = "Spatial Joining";
 
 // -- Block 1 (local t = 0-12 s within the block) --------------------------
-// Both agents walk in a single straight line toward the HUB (which sits
-// exactly on the midpoint of the G-M axis by construction -- see HUB /
-// START_G / START_M below), so walking toward the hub is walking directly
-// toward the other agent. G's local bearing toward the hub is 75 deg; M's
-// is 255 deg (exactly opposite, as required for a straight line between
-// two points on opposite sides of the same hub).
-// Each agent walks 15.0 m (10 s at 1.5 m/s) with two independent 1 s
-// pauses, for a 12 s block.
-// G's pauses fall at local t = 1-2 s and 7-8 s.
-const SCHEDULE_G_BLOCK1 = [
-    { d: 1, b: 75 }, { d: 1, b: null }, { d: 5, b: 75 },
-    { d: 1, b: null }, { d: 4, b: 75 }
-];
-// M's pauses fall at local t = 4-5 s and 10-11 s.
-const SCHEDULE_M_BLOCK1 = [
-    { d: 4, b: 255 }, { d: 1, b: null }, { d: 5, b: 255 },
-    { d: 1, b: null }, { d: 1, b: 255 }
-];
+// -- Block 1 (local t = 0-18 s within the block) --------------------------
+// 18 seconds of continuous, synchronous direct approach.
+const SCHEDULE_G_BLOCK1 = [{ d: 18, b: 75 }];
+const SCHEDULE_M_BLOCK1 = [{ d: 18, b: 255 }];
 
 // -- Block 2 (both agents fully stationary for 2 s) ------------------------
 const SCHEDULE_BLOCK2_PAUSE = [{ d: 2, b: null }];
 
-// -- Block 3 (local t = 0-12 s within the block) ---------------------------
-// Both G and M use 4-leg closed rectangles (zero net displacement each), but
-// with DIFFERENT long-leg axes so they never share a bearing at the same time
-// and never sustain movement in the same direction. Axes were chosen so that:
-//   - Neither long leg points toward or away from the other agent (avoids a
-//     sustained "following" or "fleeing" read).
-//   - The two long-leg axes are ~75 deg apart from each other (345/165 deg vs
-//     30/210 deg on screen), so the two paths look structurally different.
-//   - Pause positions never coincide between G and M (G: local t=4-5 s, 10-11 s;
-//     M: local t=1-2 s, 7-8 s), reinforcing independent rhythm.
-// Bearings are verified numerically: 0 shared-bearing events, 0 sustained
-// follow events, G-M stays 9.1-15.7 m throughout Block 3 (no near-merge,
-// no large separation), and both agents return to the meeting point (net=0).
-//
-// G: tangential-biased rectangle. Short radial leg (1 s, screen 75 deg =
-//    ~toward M) walks only 1.5 m toward M before the pause -- too brief to
-//    read as approach; the long leg (4 s, screen 345 deg = NNW) then pulls
-//    away perpendicularly. Return pair mirrors exactly, closing the loop.
-// G's pauses fall at local t = 4-5 s and 10-11 s.
+// -- Block 3 (local t = 0-18 s within the block) ---------------------------
+// 18 seconds of continuous, asynchronous movement.
+// The original SJ rectangular path logic is maintained, but scaled to 18s with no pauses.
 const SCHEDULE_G_BLOCK3 = [
-    { d: 4, b: 290 }, { d: 1, b: null }, { d: 1, b: 20 },
-    { d: 4, b: 110 }, { d: 1, b: null }, { d: 1, b: 200 }
+    { d: 8, b: 290 }, { d: 1, b: 20 }, { d: 8, b: 110 }, { d: 1, b: 200 }
 ];
-// M: same 4-leg structure, long-leg axis rotated 75 deg from G's (screen 30/210 deg
-//    vs G's 345/165 deg). From a viewer's perspective, G wanders mostly NNW/SSE while
-//    M wanders mostly NNE/SSW -- clearly different directions, no shared rhythm.
-// M's pauses fall at local t = 1-2 s and 7-8 s.
 const SCHEDULE_M_BLOCK3 = [
-    { d: 1, b: 65 }, { d: 1, b: null }, { d: 4, b: 335 },
-    { d: 1, b: 245 }, { d: 1, b: null }, { d: 4, b: 155 }
+    { d: 1, b: 65 }, { d: 8, b: 335 }, { d: 1, b: 245 }, { d: 8, b: 155 }
 ];
 
 const SCHEDULE_G = SCHEDULE_G_BLOCK1.concat(SCHEDULE_BLOCK2_PAUSE, SCHEDULE_G_BLOCK3);
@@ -112,16 +76,12 @@ const MAP_ZOOM = 18.0;                     // locked (min = max = 18.0), 0.458 m
 const WALK_SPEED_MPS = 1.5;                // 5.4 km/h -- normal walking pace
 
 // Block durations (ms), matching the experimental-flow spec exactly.
-// Block 0 is the stable/idle window; Blocks 1 and 3 are the condition's
-// SCHEDULE_G / SCHEDULE_M movement (built above); Block 2 is the shared
-// stop-between-blocks pause; Block 4 is the final stationary hold before
-// hand-back to the survey. Every boundary is a whole number of GPS fixes.
 const T_STABLE = 6000;   //  0 -  6 s   idle GPS jitter, agents at start position
-const T_BLOCK1 = 12000;  //  6 - 18 s   Block 1 movement (in SCHEDULE_*)
-const T_BLOCK2 =  2000;  // 18 - 20 s   both agents stationary (in SCHEDULE_*)
-const T_BLOCK3 = 12000;  // 20 - 32 s   Block 3 movement (in SCHEDULE_*)
-const T_BLOCK4 =  3000;  // 32 - 35 s   final stationary hold, then hand-back
-const TOTAL_ANIMATION_DURATION = T_STABLE + T_BLOCK1 + T_BLOCK2 + T_BLOCK3 + T_BLOCK4; // 35000
+const T_BLOCK1 = 18000;  //  6 - 24 s   Block 1 movement (in SCHEDULE_*)
+const T_BLOCK2 =  2000;  // 24 - 26 s   both agents stationary (in SCHEDULE_*)
+const T_BLOCK3 = 18000;  // 26 - 44 s   Block 3 movement (in SCHEDULE_*)
+const T_BLOCK4 =  3000;  // 44 - 47 s   final stationary hold, then hand-back
+const TOTAL_ANIMATION_DURATION = T_STABLE + T_BLOCK1 + T_BLOCK2 + T_BLOCK3 + T_BLOCK4; // 47000
 const FINAL_HOLD_DURATION = 0; // Block 4 above already is the final hold
 
 const EARTH_RADIUS_M = 6378137;
@@ -135,14 +95,12 @@ function offsetMeters(origin, bearingDeg, meters) {
     return [origin[0] + dLng, origin[1] + dLat];
 }
 
-// Start positions are derived from a single hub point and a single offset, so
-// the starting geometry is identical across all three conditions by
-// construction. IM does not require a meeting, but the geometry must
-// be identical across all three conditions per the flow spec.
+// Start distances increased from 20.0 to 32.0 meters.
+// The main node (U) remains at 50.0 meters so it perfectly aligns with the real road intersection.
 const HUB = offsetMeters(MAP_CENTER, rot(0), 12);
-const START_G = offsetMeters(HUB, rot(255), 20.0);
-const START_M = offsetMeters(HUB, rot(75), 20.0);
-const START_U = offsetMeters(HUB, rot(165), 50);
+const START_G = offsetMeters(HUB, rot(255), 32.0);
+const START_M = offsetMeters(HUB, rot(75), 32.0);
+const START_U = offsetMeters(HUB, rot(162), 48.0);
 
 const positions = { leftNode: START_G, rightNode: START_M, mainNode: START_U };
 
@@ -798,6 +756,82 @@ function bootstrap() {
                 // parks, water and place names -- what a real location app shows.
                 declutterBasemap();
                 applyFindMyPalette();
+                 // Define the geometry
+   map.addSource('virtual-roads', {
+       'type': 'geojson',
+       'data': {
+           'type': 'FeatureCollection',
+           'features': [
+               {
+                   'type': 'Feature',
+                   'geometry': {
+                       'type': 'LineString',
+                       'coordinates': [START_U, START_G]
+                   }
+               },
+               {
+                   'type': 'Feature',
+                   'geometry': {
+                       'type': 'LineString',
+                       'coordinates': [START_U, START_M]
+                   }
+               }
+           ]
+       }
+   });
+
+   let firstRoadCoreId = null;
+   let firstBuildingOrTextId = null;
+
+   const layers = map.getStyle().layers;
+   for (const layer of layers) {
+       const id = (layer.id || "").toLowerCase();
+       const sl = (layer['source-layer'] || "").toLowerCase();
+      
+       // buildings and text layers are the only ones that can be guaranteed to be above roads, so we use the first one we find as the insertion point for our virtual road layers.
+       if (!firstBuildingOrTextId && (layer.type === 'symbol' || sl === 'building' || layer.type === 'fill-extrusion')) {
+           firstBuildingOrTextId = layer.id;
+       }
+
+       // detect the map's existing "internal roads" (the white parts)
+       if (sl === 'transportation' && layer.type === 'line') {
+           const isCasing = /casing|outline|bridge|tunnel/.test(id);
+           if (!isCasing && !firstRoadCoreId) {
+               firstRoadCoreId = layer.id; // the first detected internal road core layer
+           }
+       }
+   }
+
+   // 3. Casing - placed below the core and above the basemap, so it appears as a light outline around the white road.
+   map.addLayer({
+       'id': 'virtual-roads-casing',
+       'type': 'line',
+       'source': 'virtual-roads',
+       'layout': {
+           'line-join': 'round',
+           'line-cap': 'butt' // prevents the casing from extending beyond the core.
+       },
+       'paint': {
+           'line-color': '#e4dfd3',
+           'line-width': 12
+       }
+   }, firstRoadCoreId || firstBuildingOrTextId);
+
+   // 4. Core Road - placed below the casing and above the basemap, so it appears as the main road.
+   map.addLayer({
+       'id': 'virtual-roads-core',
+       'type': 'line',
+       'source': 'virtual-roads',
+       'layout': {
+           'line-join': 'round',
+           'line-cap': 'butt' // prevents the core from extending beyond the casing.
+       },
+       'paint': {
+           'line-color': '#ffffff',
+           'line-width': 8
+       }
+   }, firstBuildingOrTextId);
+
                 ensureParkLabels();
 
                 // No CSS filter: a filter desaturates everything uniformly.

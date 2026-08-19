@@ -10,14 +10,14 @@ body {
     background-color: #e5e7eb;
 }
 
-/* ===== FULL-SCREEN LIGHT-GREEN ONBOARDING FLOW ===== */
+/* ===== AÇIK YEŞİL AKIŞ EKRANI STİLLERİ ===== */
 #experiment-flow-screen {
     position: fixed;
     top: 0;
     left: 0;
     width: 100vw;
     height: 100vh;
-    background-color: #e2f7c4; /* requested light green tone */
+    background-color: #e2f7c4; /* İstenen açık yeşil tonu */
     z-index: 9999;
     display: flex;
     justify-content: center;
@@ -49,7 +49,7 @@ body {
     line-height: 1.4;
 }
 
-/* Extra paragraph indent for the "Everyone joined" step */
+/* Everyone Joined özel paragraf girintisi */
 .flow-step p.paragraph-indent {
     margin-top: 15px;
     text-indent: 40px;
@@ -71,7 +71,7 @@ body {
     line-height: 1;
 }
 
-/* NICKNAME INPUT CONTAINER */
+/* NICKNAME CONTAINER KUTUSU */
 .login-container {
     display: flex;
     flex-direction: column;
@@ -104,7 +104,7 @@ body {
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
 }
 
-/* Nickname disclaimer note style */
+/* Takma ad notu stili */
 .input-note {
     font-size: 14px;
     font-weight: normal;
@@ -132,7 +132,7 @@ body {
     transition: background 0.2s, transform 0.1s;
 }
 
-/* MAP APP CHROME */
+/* MAP APP STİLLERİ */
 #header {
     height: 50px;
     background: #111827;
@@ -158,13 +158,11 @@ body {
 }
 
 /* ===== MARKER GEOMETRY =====
-   Calibrated for zoom 18 (0.458 m/pixel). Agent dots are 32 px. At the
-   affiliation join point (13.0 m apart -> ~28 px centre-to-centre) the two
-   circles overlap slightly at the edges, which is intentional: the
-   manipulation is meant to read as "standing together," not as two people
-   with a polite gap between them. During SJ's small post-join orbit, and
-   during SJC's joint out-and-back, separation can dip a little further
-   without ever fully merging into an unreadable single blob. */
+   Recalibrated for zoom 16
+    (0.458 m/pixel). At the meeting point the two agent
+   dots are 18 m apart, i.e. 39 px centre-to-centre: 32 px dots leave a visible
+   7 px gap, so the joined agents read as two people standing together rather
+   than merging into a single blob. At the previous 40 px they would overlap. */
 
 .marker-cluster {
     display: flex;
