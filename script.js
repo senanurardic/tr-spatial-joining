@@ -3,42 +3,21 @@
  * Condition: Spatial Joining (SJ)
  * Flow (t = 0 is the moment the participant submits their nickname):
  *   Block 0  0-6 s    Starting position, stable (idle GPS jitter only)
- *   Block 1  6-18 s   Synchronous approach: both agents walk in a straight
+ *   Block 1  6-24 s   Synchronous approach: both agents walk in a straight
  *                      line toward each other until they meet (12 s)
- *   Block 2  18-20 s  Both agents stop between blocks (2 s)
- *   Block 3  20-32 s  Asynchronous, independent movement (12 s), kept close
+ *   Block 2  24-26 s  Both agents stop between blocks (2 s)
+ *   Block 3  26-44 s  Asynchronous, independent movement (12 s), kept close
  *                      to the meeting point -- see the CONDITION BLOCK for
  *                      why this is a smaller loop than IM's, not a literal
  *                      reuse of IM's Block 3 schedule.
- *   Block 4  32-35 s  Both agents remain stationary before hand-back to survey
- *   Total sequence: 35 s.
- *
- * Design constraints (identical in every condition):
- *   - Walking speed 1.5 m/s (5.4 km/h), pedestrian pace.
- *   - Each agent pauses for exactly 1 s, twice, during Block 1 and again
- *     twice during Block 3, at independent (non-coinciding) times.
- *   - Each agent walks for exactly 10 s of the 12 s in Block 1 (15.0 m) and
- *     10 s of the 12 s in Block 3 (15.0 m): 30.0 m total per agent, matched
- *     to IM's total.
- *   - G-M start separation: 40.0 m, identical in every condition (see the
- *     note on the HUB/START_G/START_M geometry below for why this specific
- *     value was chosen -- it is not arbitrary).
- *   - Icons never totally overlap and never leave the zoom-18 viewport.
- *   - MANIPULATION: Block 1 is a synchronous, linear, direct approach --
- *     both agents walk straight toward one another (bearing = straight down
- *     the G-M axis), ending at a "meeting" distance
- *     Block 3 then reverts to the same independent,
- *     non-mirrored wandering used throughout IM, so the affiliation cue is
- *     confined to Block 1 and does not linger into Block 3.
- * ========================================================================== */
-
+ *   Block 4  44-47 s  Both agents remain stationary before hand-back to survey
+ *   Total sequence: 47 s.
 /* ==========================================================================
  * CONDITION BLOCK -- the only part that differs between the three repos
  * ========================================================================== */
 const CONDITION = "SJ";
 const CONDITION_LABEL = "Spatial Joining";
 
-// -- Block 1 (local t = 0-12 s within the block) --------------------------
 // -- Block 1 (local t = 0-18 s within the block) --------------------------
 // 18 seconds of continuous, synchronous direct approach.
 const SCHEDULE_G_BLOCK1 = [{ d: 18, b: 75 }];
